@@ -1,6 +1,6 @@
 # Wiki
 
-BookStack with HedgeDoc integration
+[WIP] BookStack with HedgeDoc integration
 
 ## Usage
 
