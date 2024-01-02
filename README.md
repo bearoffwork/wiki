@@ -1,1 +1,3 @@
-# wiki
+# Wiki
+
+BookStack with HedgeDoc integration

@@ -1,0 +1,8 @@
+[submodule "bookstack"]
+	path = bookstack
+	url = https://github.com/rra3b/BookStack.git
+	branch = release
+[submodule "hedgedoc"]
+	path = hedgedoc
+	url = https://github.com/rra3b/hedgedoc.git
+	branch = main
