@@ -1,0 +1,119 @@
+version: '3.9'
+# This is a Docker Compose configuration
+# intended for development purposes only
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+
+volumes:
+  db: { }
+
+services:
+  bookstack:
+    build:
+      context: .containers/php
+    environment:
+      APP_URL: ${URL_SCHEME}://${BOOKSTACK_DOMAIN}:${DEV_PORT:-80}
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWD}@db/${BOOKSTACK_DB}
+      TEST_DATABASE_URL: mysql://${BOOKSTACK_TESTING_DB_USER}:${BOOKSTACK_TESTING_DB_PASSWORD}@db/${BOOKSTACK_TESTING_DB}
+      MAIL_DRIVER: smtp
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+    hostname: bookstack-app
+    working_dir: /var/www/bookstack
+    volumes:
+      - ./bookstack:/var/www/bookstack
+    networks:
+      backend:
+    depends_on:
+      - db
+      - mailhog
+
+  bookstack-builder:
+    build:
+      context: .containers/php
+      target: builder
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWD}@db/${BOOKSTACK_DB}
+    working_dir: /var/www/bookstack
+    volumes:
+      - ./bookstack:/var/www/bookstack
+    networks:
+      backend:
+    depends_on:
+      - db
+      - mailhog
+
+  hedgedoc:
+    build:
+      context: .containers/node
+      target: dev
+    environment:
+      CMD_DB_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWD}@db/${HEDGEDOC_DB}
+      CMD_DOMAIN: ${HEDGEDOC_DOMAIN}
+      CMD_URL_ADDPORT: ${HEDGEDOC_URL_ADDPORT:-false}
+      CMD_ALLOW_FREEURL: true
+    working_dir: /hedgedoc
+    volumes:
+      - ./hedgedoc:/hedgedoc
+    #      - ./storage/uploads:/hedgedoc/public/uploads
+    networks:
+      backend:
+    depends_on:
+      - db
+
+  hedgedoc-builder:
+    build:
+      context: .containers/node
+      target: builder
+    working_dir: /hedgedoc
+    tty: true
+    volumes:
+      - ./hedgedoc:/hedgedoc
+      - ./.containers/node/build-hedgedoc.sh:/build-hedgedoc.sh
+    command: /build-hedgedoc.sh
+
+  nginx:
+    build:
+      context: .containers/nginx
+    environment:
+      BOOKSTACK_DOMAIN: ${BOOKSTACK_DOMAIN}
+      HEDGEDOC_DOMAIN: ${HEDGEDOC_DOMAIN}
+    ports:
+      - "${DEV_PORT:-80}:80"
+    volumes:
+      - ./bookstack:/var/www/bookstack
+    networks:
+      frontend:
+      backend:
+        aliases:
+          - ${BOOKSTACK_DOMAIN}
+          - ${HEDGEDOC_DOMAIN}
+    depends_on:
+      - bookstack
+      - hedgedoc
+
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_DATABASE: ${BOOKSTACK_DB}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWD}
+    volumes:
+      - .containers/init.db:/docker-entrypoint-initdb.d
+      - db:/var/lib/mysql
+    ports:
+      - "3304:3306"
+    networks:
+      - backend
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "8025:8025"
+    networks:
+      - backend
